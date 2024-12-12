@@ -61,3 +61,20 @@ func (rs *Routes) GetProduct(
 		}
 	}
 }
+
+// GetAll is the handler for get all the products.
+func (rs *Routes) GetAll(w http.ResponseWriter, r *http.Request) {
+	// Fetch
+	err, ps := rs.productService.GetAll()
+	if err != nil {
+		http.Error(w, "500: Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	// Send
+	enc := json.NewEncoder(w)
+	if err = enc.Encode(ps); err != nil {
+		http.Error(w, "500: Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+}

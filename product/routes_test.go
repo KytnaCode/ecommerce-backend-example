@@ -12,6 +12,9 @@ import (
 type MockProductService struct {
 	// getFn is used as body of MockProductService.Get to allow using the same mock for all tests.
 	getFn func(id string) (error, *product.Product)
+
+	// getAllFn is used as body of MockProductService.Get to allow using the same mock for all tests.
+	getAllFn func() (error, []product.Product)
 }
 
 // Get implements `product.Service.Get`.
@@ -19,6 +22,11 @@ func (ps *MockProductService) Get(
 	id string,
 ) (error, *product.Product) {
 	return ps.getFn(id)
+}
+
+// GetAll implements `product.Service.GetAll`.
+func (ps *MockProductService) GetAll() (error, []product.Product) {
+	return ps.getAllFn()
 }
 
 // AlwaysValid is a validator that always return a nil error.
@@ -106,6 +114,43 @@ func TestGetProduct_shouldReturnBadRequestIfInvalidID(t *testing.T) {
 	if rr.Code != http.StatusBadRequest {
 		t.Errorf(
 			"GetProduct should return a bad request response for an invalid id: got %v",
+			rr.Code,
+		)
+	}
+}
+
+func TestGetAll_shouldReturnAnOkStatusCode(t *testing.T) {
+	t.Parallel()
+
+	req := httptest.NewRequest("GET", "/products", nil)
+	rr := httptest.NewRecorder()
+
+	rs := product.NewRoutes(&MockProductService{getAllFn: func() (error, []product.Product) {
+		return nil, []product.Product{}
+	}})
+
+	rs.GetAll(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("GetAll should return an ok status code: got %v", rr.Code)
+	}
+}
+
+func TestGetAll_shouldReturnAnInternalServerErrorStatusIfCannotGetProducts(t *testing.T) {
+	t.Parallel()
+
+	req := httptest.NewRequest("GET", "/products", nil)
+	rr := httptest.NewRecorder()
+
+	rs := product.NewRoutes(&MockProductService{getAllFn: func() (error, []product.Product) {
+		return errors.New("example error"), nil
+	}})
+
+	rs.GetAll(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Errorf(
+			"GetAll should return an internal server error status if cannot get products: got %v",
 			rr.Code,
 		)
 	}
