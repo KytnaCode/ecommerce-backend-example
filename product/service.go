@@ -29,4 +29,7 @@ type Service interface {
 		on Get, then a non-nil error and a nil pointer will be returned.
 	*/
 	Get(id string) (error, *Product)
+
+	// GetAll returns all products in the service.
+	GetAll() (error, []Product)
 }
