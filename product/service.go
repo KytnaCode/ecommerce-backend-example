@@ -31,4 +31,7 @@ type Service interface {
 		on Get, then a non-nil error and a nil pointer will be returned.
 	*/
 	Get(id string) (error, *Product)
+
+	// Create creates a new product on base on `p` and fulfills the field id of `p`.
+	Create(p *Product) error
 }
