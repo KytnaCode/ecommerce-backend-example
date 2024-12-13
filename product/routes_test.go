@@ -1,6 +1,8 @@
 package product_test
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +14,9 @@ import (
 type MockProductService struct {
 	// getFn is used as body of MockProductService.Get to allow using the same mock for all tests.
 	getFn func(id string) (error, *product.Product)
+
+	// createFn is used as body of MockProductService.Create to allow using the same mock for all tests.
+	createFn func(p *product.Product) error
 }
 
 // Get implements `product.Service.Get`.
@@ -19,6 +24,10 @@ func (ps *MockProductService) Get(
 	id string,
 ) (error, *product.Product) {
 	return ps.getFn(id)
+}
+
+func (ps *MockProductService) Create(p *product.Product) error {
+	return ps.createFn(p)
 }
 
 // AlwaysValid is a validator that always return a nil error.
@@ -108,5 +117,79 @@ func TestGetProduct_shouldReturnBadRequestIfInvalidID(t *testing.T) {
 			"GetProduct should return a bad request response for an invalid id: got %v",
 			rr.Code,
 		)
+	}
+}
+
+func TestCreate_shouldReturnCreatedStatus(t *testing.T) {
+	t.Parallel()
+
+	var b bytes.Buffer
+
+	enc := json.NewEncoder(&b)
+	if err := enc.Encode(product.CreateRequest{}); err != nil {
+		t.Fatalf("could not write body: %v", err)
+	}
+
+	req := httptest.NewRequest("POST", "/products", &b)
+	rr := httptest.NewRecorder()
+
+	rs := product.NewRoutes(&MockProductService{createFn: func(p *product.Product) error {
+		p.ID = "my-example-id"
+		return nil
+	}})
+
+	rs.Create(&AlwaysValid[product.CreateRequest]{})(rr, req)
+
+	if rr.Code != http.StatusCreated {
+		t.Errorf("Create should return a created status code: got %v", rr.Code)
+		return
+	}
+}
+
+func TestCreate_shouldReturnBadRequestForInvalidData(t *testing.T) {
+	t.Parallel()
+
+	var b bytes.Buffer
+
+	err := json.NewEncoder(&b).Encode(product.CreateRequest{})
+	if err != nil {
+		t.Fatalf("could not write request body: %v", err)
+	}
+
+	req := httptest.NewRequest("POST", "/products", &b)
+	rr := httptest.NewRecorder()
+
+	rs := product.NewRoutes(&MockProductService{createFn: func(p *product.Product) error {
+		return nil
+	}})
+
+	rs.Create(AlwaysInvalid[product.CreateRequest]{})(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("Create should return bad request status if the request is invalid: got status %v", rr.Code)
+	}
+}
+
+func TestCreate_shouldReturnInternalServerErrorIfThereIsAnErrorWithProductService(t *testing.T) {
+	t.Parallel()
+
+	var b bytes.Buffer
+
+	err := json.NewEncoder(&b).Encode(product.CreateRequest{})
+	if err != nil {
+		t.Fatalf("could not write request body: %v", err)
+	}
+
+	req := httptest.NewRequest("POST", "/products", &b)
+	rr := httptest.NewRecorder()
+
+	rs := product.NewRoutes(&MockProductService{createFn: func(p *product.Product) error {
+		return errors.New("example error")
+	}})
+
+	rs.Create(AlwaysValid[product.CreateRequest]{})(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Errorf("Create should return internal server error status when an error ocurrs on product service: got status %v", rr.Code)
 	}
 }
