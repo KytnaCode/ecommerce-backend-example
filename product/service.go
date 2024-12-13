@@ -17,7 +17,9 @@ func (e NotFoundError) Error() string {
 }
 
 // Product is a model for a product.
-type Product struct{}
+type Product struct {
+	ID string
+}
 
 // Service abstracts product access methods.
 type Service interface {
